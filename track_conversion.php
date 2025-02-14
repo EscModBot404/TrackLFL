@@ -3,9 +3,10 @@ require_once dirname(__FILE__) . '/kclient.php';
 
 session_start();  // Запускаем сессию
 
-$client = new KClient('https://traffichot.store/', 'zfsw6vb8cwsdrg2bms6jnvkqqrhpymvs');
-
-$client->restoreFromSession();  // Восстанавливаем данные клика из сессии
+// Проверяем, передан ли clickid в GET-запросе
+if (isset($_GET['clickid'])) {
+    $_SESSION['clickid'] = $_GET['clickid']; // Сохраняем Click ID в сессию
+}
 
 // Проверяем, есть ли clickid в сессии
 if (!isset($_SESSION['clickid'])) {
@@ -13,7 +14,7 @@ if (!isset($_SESSION['clickid'])) {
 }
 
 $clickid = $_SESSION['clickid'];
-$event_type = $_POST['event_type'] ?? '';  // Получаем тип события
+$event_type = $_GET['event_type'] ?? '';  // Получаем тип события через GET
 
 // Определяем статус и сумму конверсии в зависимости от события
 switch ($event_type) {
@@ -23,11 +24,11 @@ switch ($event_type) {
         break;
     case 'purchase':
         $status = 'approved';
-        $revenue = $_POST['amount'] ?? 50;
+        $revenue = $_GET['amount'] ?? 50;
         break;
     case 'spend_credits':
         $status = 'credit_spent';
-        $revenue = $_POST['credits_spent'] ?? 10;
+        $revenue = $_GET['credits_spent'] ?? 10;
         break;
     default:
         die(json_encode(["status" => "error", "message" => "Неизвестный тип события."]));
@@ -49,4 +50,13 @@ curl_setopt($ch, CURLOPT_POST, 1);
 $output = curl_exec($ch);
 curl_close($ch);
 
-echo json_encode(["status" => "success", "message" => "Конверсия записана.", "keitaro_response" => $output]);
+// Логируем запрос и ответ
+file_put_contents('log.txt', date("Y-m-d H:i:s") . " - Sent: " . json_encode($params) . " - Response: " . $output . "\n", FILE_APPEND);
+
+echo json_encode([
+    "status" => "success",
+    "message" => "Conversion is recorded",
+    "event_type" => $event_type,
+    "sent_data" => $params,
+    "keitaro_response" => $output
+]);
